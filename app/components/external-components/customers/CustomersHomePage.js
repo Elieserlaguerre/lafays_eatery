@@ -61,11 +61,6 @@ export default function CustomersHomePage() {
 										</a>
 									))}
 								</div>
-								<div className="py-6">
-									<a href="#" className="-mx-3 block rounded-lg px-3 py-2.5 text-base/7 font-semibold text-gray-900 hover:bg-gray-50">
-										Log in
-									</a>
-								</div>
 							</div>
 						</div>
 					</DialogPanel>
@@ -81,7 +76,7 @@ export default function CustomersHomePage() {
 
 						<div className="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
 							<div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
-								<div className="hidden sm:mb-10 sm:flex">
+								<div className="sm:mb-10 sm:flex">
 									<p className="relative px-3 py-1 text-2xl font-medium text-gray-900">Lafay's Eatery</p>
 								</div>
 								<h1 className="text-5xl font-semibold tracking-tight text-pretty text-gray-900 sm:text-7xl">Where Culture Meets Craftsmanship.</h1>
