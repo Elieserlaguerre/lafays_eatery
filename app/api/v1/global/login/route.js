@@ -3,8 +3,6 @@ import db from "@/app/lib/database/config";
 import { platformUsers } from "@/app/lib/model/helpers";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 export async function GET(req) {
 	try {
 		await db.connect();
