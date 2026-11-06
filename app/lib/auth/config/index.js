@@ -1,5 +1,6 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-import { verifyPassword } from "./helpers";
+import { verifyPassword } from "../helpers";
+
 
 const authOptions = {
 	providers: [
