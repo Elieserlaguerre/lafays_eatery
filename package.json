@@ -1,22 +1,51 @@
 {
-  "name": "lafays_eatery",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "next": "16.4.5",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "16.4.5",
-    "tailwindcss": "^4"
-  }
+	"name": "lafays_eatery",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"dev": "concurrently \"npm run watch:subdomains\" \"npm run watch:proxy\" \"next dev\"",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint",
+		"watch:subdomains": "node ./scripts/generate-subdomains.js",
+		"watch:proxy": "node ./scripts/generate-proxy.js"
+	},
+	"dependencies": {
+		"@headlessui/react": "^2.2.10",
+		"@heroicons/react": "^2.2.0",
+		"@reduxjs/toolkit": "^2.14.0",
+		"bcrypt": "^6.0.0",
+		"chokidar": "^6.0.0",
+		"class-variance-authority": "^0.7.1",
+		"cloudinary": "^2.11.0",
+		"concurrently": "^10.0.6",
+		"date-fns": "^4.4.0",
+		"jotai": "^3.0.1",
+		"mongoose": "^9.11.4",
+		"nanoid": "^6.0.2",
+		"next": "16.4.5",
+		"next-auth": "^4.24.15",
+		"next-redux-wrapper": "^8.1.0",
+		"radix-ui": "^1.8.1",
+		"react": "19.3.0",
+		"react-dom": "19.3.0",
+		"react-hot-toast": "^2.6.1",
+		"react-icons": "^5.7.0",
+		"react-redux": "^9.3.1",
+		"react-star-ratings": "^2.3.0",
+		"redux": "^5.0.1",
+		"redux-persist": "^6.0.0",
+		"shadcn": "^4.23.0",
+		"slugify": "^1.6.9",
+		"stripe": "^23.1.0",
+		"swiper": "^14.4.0",
+		"zod": "^4.6.7",
+		"zod-validation-error": "^5.0.0"
+	},
+	"devDependencies": {
+		"@tailwindcss/turbopack": "^4",
+		"eslint": "^9",
+		"eslint-config-next": "16.4.5",
+		"tailwindcss": "^4"
+	}
 }
