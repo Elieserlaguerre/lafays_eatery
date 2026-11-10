@@ -6,6 +6,9 @@ import Link from "next/link";
 import mainImage from "@/public/images/customers/home-page/lafays_eatery_customers_hero_section.jpg";
 import Image from "next/image";
 import OurStory from "./OurStory";
+import TheCraftsmanship from "./TheCraftsmanship";
+import FeaturedProducts from "./FeaturedProducts";
+import CallToAction from "./CallToAction";
 
 export default function CustomersHomePage() {
 	const navigation = [
@@ -95,6 +98,9 @@ export default function CustomersHomePage() {
 				</div>
 			</div>
 			<OurStory />
+			<TheCraftsmanship />
+			{/* <FeaturedProducts /> */}
+			{/* <CallToAction /> */}
 		</div>
 	);
 }

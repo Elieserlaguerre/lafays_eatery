@@ -25,8 +25,7 @@ export default function OurStory() {
 			<div className="mx-auto max-w-7xl px-6 lg:px-8">
 				<div className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-5">
 					<div className="col-span-2">
-						<h2 className="text-base/7 font-semibold text-indigo-600 capitalize">our story</h2>
-						<p className="mt-2 text-4xl font-semibold tracking-tight text-pretty text-gray-900 sm:text-5xl">More Than a Meal. It's a Labor of Love.</p>
+						<p className="text-4xl font-semibold tracking-tight text-pretty text-gray-900 sm:text-5xl">More Than a Meal. It's a Labor of Love.</p>
 						<p className="mt-6 text-base/7 text-gray-700">At Lafay's Eatery, great food begins with a genuine love for the craft. Inspired by the rich culinary traditions of different cultures, our kitchen brings together an appreciation for bold flavors, treasured recipes, and the little details that make every dish special. From the vibrant spices of Haitian and Jamaican cuisine to the comforting familiarity of Black American Soul Food, each culinary tradition offers something worth celebrating.</p>
 						<p className="mt-6 text-base/7 text-gray-700">Our approach is simple: learn, appreciate, create, and serve with care. Every dish is an opportunity to share that passion with the people around us.</p>
 					</div>
