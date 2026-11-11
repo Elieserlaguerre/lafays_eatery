@@ -47,7 +47,7 @@ const isNotSubDomain = !isValidSubdomain;
 
 // create a base response that always sets the cookie
 const baseResponse = NextResponse.next();
-baseResponse.cookies.set("current_subdomain", isNotSubDomain ? "customers" : subdomain, {
+baseResponse.cookies.set("current_domain", isNotSubDomain ? "customers" : subdomain, {
 path: "/",
 httpOnly: false, // readable on client side
 secure: process.env.NODE_ENV === "production",

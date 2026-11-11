@@ -98,9 +98,9 @@ export default function CustomersHomePage() {
 				</div>
 			</div>
 			<OurStory />
+			<FeaturedProducts />
 			<TheCraftsmanship />
-			{/* <FeaturedProducts /> */}
-			{/* <CallToAction /> */}
+			<CallToAction />
 		</div>
 	);
 }
