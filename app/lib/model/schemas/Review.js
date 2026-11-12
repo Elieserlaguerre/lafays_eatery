@@ -4,14 +4,8 @@ const { ObjectId } = Schema;
 
 const reviewSchema = new Schema(
 	{
-		title: {
-			type: String,
-			trim: true,
-			required: true
-		},
 		rating: {
-			type: String,
-			trim: true,
+			type: Number,
 			required: true
 		},
 		comment: {
@@ -19,7 +13,7 @@ const reviewSchema = new Schema(
 			trim: true,
 			required: true
 		},
-		customer: {
+		author: {
 			type: ObjectId,
 			ref: "Customer",
 			required: true

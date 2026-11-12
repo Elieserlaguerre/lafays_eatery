@@ -6,18 +6,22 @@ import entray4 from "../../../../public/images/customers/home-page/entray_4.jpg"
 export default function TheCraftsmanship() {
 	const stats = [
 		{
+			_id: 1,
 			stat: 10,
 			description: "categories"
 		},
 		{
+			_id: 2,
 			stat: 50,
 			description: "subcategories"
 		},
 		{
+			_id: 3,
 			stat: 250,
 			description: "orders placed"
 		},
 		{
+			_id: 4,
 			stat: 1000,
 			description: "customers"
 		}
@@ -56,7 +60,7 @@ export default function TheCraftsmanship() {
 						<hr className="mt-6 border-t border-gray-200" />
 						<dl className="mt-6 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
 							{stats.map((metric) => (
-								<div className="flex flex-col gap-y-2 border-b border-dotted border-gray-200 pb-4">
+								<div key={metric._id} className="flex flex-col gap-y-2 border-b border-dotted border-gray-200 pb-4">
 									<dt className="text-sm/6 text-gray-600 capitalize">{metric.description}</dt>
 									<dd className="order-first text-6xl font-semibold tracking-tight text-gray-900">{metric.stat}</dd>
 								</div>

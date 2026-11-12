@@ -12,7 +12,7 @@ import CallToAction from "./CallToAction";
 
 export default function CustomersHomePage() {
 	const navigation = [
-		{ name: "Home", href: "#" },
+		{ name: "Home", href: "/" },
 		{ name: "register", href: "#" },
 		{ name: "sign in", href: "#" }
 	];

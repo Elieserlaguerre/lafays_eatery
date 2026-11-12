@@ -20,16 +20,41 @@ const productSchema = new Schema(
 			trim: true,
 			required: true
 		},
+		colors: {
+			available: {
+				type: Boolean,
+				default: false
+			},
+			set: {
+				type: [
+					{
+						name: {
+							type: String,
+							trim: true
+						},
+						value: {
+							type: String,
+							trim: true
+						}
+					}
+				],
+				default: []
+			}
+		},
 		details: {
 			type: [
 				{
-					title: {
+					name: {
 						type: String,
 						trim: true
 					},
-					description: {
-						type: String,
-						trim: true
+					list: {
+						type: [
+							{
+								type: String,
+								trim: true
+							}
+						]
 					}
 				}
 			],
@@ -175,6 +200,21 @@ const productSchema = new Schema(
 					ref: "Review"
 				}
 			]
+		},
+		faqs: {
+			type: [
+				{
+					question: {
+						type: String,
+						trim: true
+					},
+					answer: {
+						type: String,
+						trim: true
+					}
+				}
+			],
+			default: []
 		}
 	},
 	{ timestamps: true }
