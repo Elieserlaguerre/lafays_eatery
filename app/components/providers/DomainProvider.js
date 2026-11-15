@@ -1,11 +1,10 @@
 "use client";
-
-import { currentDepartment } from "@/app/lib/state-management/global-state";
+import { currentDomain } from "@/app/lib/state-management/section/global";
 import { useSetAtom } from "jotai";
 import React, { Fragment, useEffect } from "react";
 
 export default function DomainProvider({ children, subdomain }) {
-	const setDepartment = useSetAtom(currentDepartment);
+	const setDepartment = useSetAtom(currentDomain);
 
 	useEffect(() => {
 		setDepartment(subdomain);

@@ -9,7 +9,7 @@ const authOptions = {
 			credentials: {
 				email: { label: "Email", type: "email" },
 				password: { label: "Password", type: "password" },
-				department: { label: "Department", type: "text" }
+				domain: { label: "domain", type: "text" }
 			},
 			async authorize(credentials, req) {
 				try {
@@ -44,7 +44,7 @@ const authOptions = {
 				token.image = user.image;
 				token.cloudinarySubfolder = user.cloudinarySubfolder;
 				token.status = user.status;
-				token.department = user.department;
+				token.domain = user.domain;
 			}
 
 			//Update token when session is manually updated via `update()`
@@ -53,7 +53,7 @@ const authOptions = {
 				token.name = session.user.name ?? token.name;
 				token.image = session.user.image ?? token.image;
 				token.status = session.user.status ?? token.status;
-				token.department = session.user.department ?? token.department;
+				token.domain = session.user.domain ?? token.domain;
 			}
 
 			return token;
@@ -68,7 +68,7 @@ const authOptions = {
 			session.user.image = token.image;
 			session.user.cloudinarySubfolder = token.cloudinarySubfolder;
 			session.user.status = token.status;
-			session.user.department = token.department;
+			session.user.domain = token.domain;
 
 			return session;
 		}

@@ -16,7 +16,7 @@ const SUBDOMAINS_JSON = path.join(PROJECT_ROOT, "subdomains.json");
 const OUTPUT_MIDDLEWARE = path.join(PROJECT_ROOT, "proxy.js");
 
 // Folders to ignore when scanning app/
-const EXCLUDED_FOLDERS = ["api", "components", "lib", "styles", "public", "node_modules", "utils", "templates"];
+const EXCLUDED_FOLDERS = ["api", "components", "lib", "styles"];
 
 let debounceTimer = null;
 const DEBOUNCE_MS = 1000;
@@ -190,14 +190,14 @@ const hostname = req.headers.get("host") ?? "";
 const subdomain = hostname?.split(".")[0];
 const port = url.port;
 
-const allowedDomains = [\`localhost:\${port}\`, "thesneakingoutclub.com", "the-sneaking-out-club-git-preview-synergistic-enterprises.vercel.app"];
+const allowedDomains = [\`localhost:\${port}\`, "https://www.lafayseatery.com/", "https://lafayseatery-9kt7q4obg-synergistic-enterprises.vercel.app/"];
 const isAllowedDomain = allowedDomains.some((domain) => hostname.includes(domain));
 const isValidSubdomain = PLATFORM_ROUTES.some((d) => d.subdomain === subdomain);
 const isNotSubDomain = !isValidSubdomain;
 
 // create a base response that always sets the cookie
 const baseResponse = NextResponse.next();
-baseResponse.cookies.set("current_domain", isNotSubDomain ? "customers" : subdomain, {
+baseResponse.cookies.set("domain", isNotSubDomain ? "customers" : subdomain, {
 path: "/",
 httpOnly: false, // readable on client side
 secure: process.env.NODE_ENV === "production",

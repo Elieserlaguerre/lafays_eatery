@@ -12,13 +12,15 @@ export const verifyPassword = async (credentials, req) => {
 	try {
 		await db.connect();
 
-		const { email, password, select_account, department } = credentials;
+		const { email, password, domain } = credentials;
+
+		console.log("credentials", credentials);
 
 		let user = null;
 		let passwordMatch = false;
 
-		if (department) {
-			user = await platformUsers[department].findOne({ email });
+		if (domain) {
+			user = await platformUsers[domain].findOne({ email });
 			passwordMatch = user && (await bcrypt.compare(password, user.password));
 		} else {
 			throw new Error("Document model is not recognized.");
@@ -36,7 +38,7 @@ export const verifyPassword = async (credentials, req) => {
 			image: user?.image ?? "",
 			cloudinarySubfolder: user?.cloudinarySubfolder ?? "",
 			status: user?.status || null,
-			department: department
+			domain: domain
 		};
 
 		return { verified: true, user: userObj };

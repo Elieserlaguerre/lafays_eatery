@@ -1,4 +1,4 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query";
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 /*
 =====================
@@ -11,5 +11,5 @@ export const multiTenantApi = createApi({
 	reducerPath: "multiTenantApi",
 	baseQuery: fetchBaseQuery({ baseUrl: "/api/v1" }),
 	endpoints: () => ({}),
-	tagTypes: ["global user registration"]
+	tagTypes: ["global user registration", "global user login", "global current user"]
 });

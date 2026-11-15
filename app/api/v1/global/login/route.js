@@ -13,15 +13,15 @@ export async function GET(req) {
 		data = Object.fromEntries(query.entries());
 		console.log("data", data);
 
-		const { email, password, department } = data;
+		const { email, password, domain } = data;
 
 		if (!email) return NextResponse.json({ message: "email is required." }, { status: 400 });
 		if (!password) return NextResponse.json({ message: "password is required." }, { status: 400 });
-		if (!department) return NextResponse.json({ message: "department is required." }, { status: 400 });
+		if (!domain) return NextResponse.json({ message: "domain is required." }, { status: 400 });
 
-		let user, passwordMatch, verifiedUser;
+		let user, passwordMatch;
 
-		user = await platformUsers[department].findOne({ email }).lean();
+		user = await platformUsers[domain].findOne({ email }).lean();
 
 		if (!user) return NextResponse.json({ message: "User not found." }, { status: 404 });
 
@@ -29,12 +29,12 @@ export async function GET(req) {
 
 		if (passwordMatch.verified === false) return NextResponse.json({ message: "Invalid email or password." }, { status: 401 });
 
-		verifiedUser = {
+		const results = {
 			...user,
 			password
 		};
 
-		return NextResponse.json({ results: verifiedUser, message: "User Verified." }, { status: 200 });
+		return NextResponse.json({ results, message: "User Verified." }, { status: 200 });
 	} catch (error) {
 		console.log("GET route error:", error.message);
 		return NextResponse.json({ message: error.message }, { status: 500 });

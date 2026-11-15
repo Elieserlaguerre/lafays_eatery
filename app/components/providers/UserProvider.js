@@ -1,14 +1,14 @@
 "use client";
 
 import { useLazyGetCurrentUserQuery } from "@/app/lib/redux/data-fetching/global-api";
-import { currentDepartment, currentUser } from "@/app/lib/state-management/global-state";
+import { currentDomain, currentUser } from "@/app/lib/state-management/section/global";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useSession } from "next-auth/react";
 import React, { Fragment, useEffect } from "react";
 import toast from "react-hot-toast";
 
 export default function UserProvider({ children }) {
-	const department = useAtomValue(currentDepartment);
+	const domain = useAtomValue(currentDomain);
 	const setCurrentUser = useSetAtom(currentUser);
 	const { data: session, status } = useSession();
 	const user = session?.user;
@@ -36,7 +36,7 @@ export default function UserProvider({ children }) {
 	}, [getUserResults.isFetching]);
 
 	useEffect(() => {
-		if (status === "authenticated" && user) getUser({ userId: user._id, department: department });
+		if (status === "authenticated" && user) getUser({ userId: user._id, domain: domain });
 	}, [status]);
 
 	return <Fragment>{children}</Fragment>;

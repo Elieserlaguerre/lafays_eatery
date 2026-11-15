@@ -16,11 +16,11 @@ export const useTheme = () => {
 	return context;
 };
 
-export function ThemeProvider({ children, department }) {
+export function ThemeProvider({ children, domain }) {
 	const theme = useMemo(() => {
-		if (!department) return null;
-		return dynamicLayoutThemeColor(department);
-	}, [department]);
+		if (!domain) return null;
+		return dynamicLayoutThemeColor(domain);
+	}, [domain]);
 
 	return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 }

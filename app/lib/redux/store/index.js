@@ -6,10 +6,14 @@ import { setupListeners } from "@reduxjs/toolkit/query/react";
 import { persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from "redux-persist";
 import { multiTenantApi } from "../data-fetching/root-api";
 
+const initialState = {};
 
+function placeholderReducer(state = initialState, action) {
+	return state;
+}
 
 const rootReducer = combineReducers({
-//reducer
+	placeholder: placeholderReducer
 });
 
 // ✅ Lazy load the `storage` only in the browser
