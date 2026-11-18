@@ -2,22 +2,14 @@
 import React from "react";
 import { useAtomValue } from "jotai";
 import { currentDomain } from "@/app/lib/state-management/section/global";
-import CustomersFooter from "../navigation/components/CustomersFooter";
-import AdminFooter from "../navigation/components/AdminFooter";
 import Register from "../global-components/Register";
 import Login from "../global-components/Login";
+import Navbar from "../navigation/components/Navbar";
+import { dynamicExternalNavlist } from "@/app/lib/util/frontend";
+import Footer from "../navigation/components/Footer";
 
 export default function ExternalLayout({ children }) {
 	const domain = useAtomValue(currentDomain);
-
-	const dynamicFooter = () => {
-		switch (domain) {
-			case "admin":
-				return <AdminFooter />;
-			default:
-				return <CustomersFooter />;
-		}
-	};
 
 	const dynamicNavbar = () => {
 		switch (domain) {
@@ -33,7 +25,9 @@ export default function ExternalLayout({ children }) {
 		<div>
 			<div>{dynamicNavbar()}</div>
 			<div className="min-h-screen">{children}</div>
-			<div>{dynamicFooter()}</div>
+			<div>
+				<Footer />
+			</div>
 			<div className="hidden">
 				<Register />
 				<Login />
