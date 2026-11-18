@@ -9,7 +9,9 @@ const ROUTING = {
   "platformRoutes": [
     {
       "subdomain": "admin",
-      "externalRoutes": [],
+      "externalRoutes": [
+        "legal"
+      ],
       "internalRoutes": [
         "account",
         "categories",
@@ -22,9 +24,25 @@ const ROUTING = {
       ],
       "externalHome": true,
       "internalHome": false
+    },
+    {
+      "subdomain": "careers",
+      "externalRoutes": [],
+      "internalRoutes": [],
+      "externalHome": true,
+      "internalHome": false
+    },
+    {
+      "subdomain": "support",
+      "externalRoutes": [],
+      "internalRoutes": [],
+      "externalHome": true,
+      "internalHome": false
     }
   ],
-  "rootExternalRoutes": [],
+  "rootExternalRoutes": [
+    "terms"
+  ],
   "rootInternalRoutes": [
     "dashboard",
     "view"

@@ -1,5 +1,6 @@
 // scripts/generate-proxy.js
-// Final: Adds dynamic route scanning for root (main) app external/internal sections.
+// Generates subdomains.json and proxy.js from the Next.js app directory.
+// Run: node scripts/generate-proxy.js [--once]
 
 import fs from "fs";
 import fsp from "fs/promises";
@@ -8,324 +9,380 @@ import crypto from "crypto";
 import chokidar from "chokidar";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const APP_DIR = path.join(PROJECT_ROOT, "app");
 const SUBDOMAINS_JSON = path.join(PROJECT_ROOT, "subdomains.json");
-const OUTPUT_MIDDLEWARE = path.join(PROJECT_ROOT, "proxy.js");
+const OUTPUT_PROXY = path.join(PROJECT_ROOT, "proxy.js");
 
-// Folders to ignore when scanning app/
-const EXCLUDED_FOLDERS = ["api", "components", "lib", "styles"];
+const EXCLUDED_FOLDERS = new Set(["api", "components", "lib", "styles", "hooks", "providers", "database", "utils", "assets", "fonts", "public", "node_modules", "_components", "_lib"]);
+const SECTION_NAMES = ["(external-section)", "(internal-section)"];
+const DEBOUNCE_MS = 350;
+let debounceTimer;
+let buildQueue = Promise.resolve();
 
-let debounceTimer = null;
-const DEBOUNCE_MS = 1000;
-function debounce(cb) {
-	clearTimeout(debounceTimer);
-	debounceTimer = setTimeout(cb, DEBOUNCE_MS);
+function sha256(value) {
+	return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-function sha256(str) {
-	return crypto.createHash("sha256").update(str).digest("hex");
-}
-
-async function getImmediateDirectories(dirPath) {
+async function directories(dir) {
 	try {
-		const entries = await fsp.readdir(dirPath, { withFileTypes: true });
-		return entries.filter((e) => e.isDirectory()).map((d) => d.name);
-	} catch {
-		return [];
+		return (await fsp.readdir(dir, { withFileTypes: true }))
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.sort((a, b) => a.localeCompare(b));
+	} catch (error) {
+		if (error.code === "ENOENT") return [];
+		throw error;
 	}
 }
 
-async function readSectionRoutes(folderPathCandidates = []) {
-	for (const p of folderPathCandidates) {
-		if (!p) continue;
-		try {
-			if (!fs.existsSync(p)) continue;
-			const names = await getImmediateDirectories(p);
-			const valid = names.filter((n) => {
-				const lower = n.toLowerCase();
-				return !/^[._]/.test(n) && !EXCLUDED_FOLDERS.includes(n) && !lower.includes("components") && !lower.includes("hooks") && !lower.includes("lib") && !lower.includes("styles");
-			});
-			return valid;
-		} catch {}
+async function isDirectory(dir) {
+	try {
+		return (await fsp.stat(dir)).isDirectory();
+	} catch (error) {
+		if (error.code === "ENOENT") return false;
+		throw error;
 	}
-	return [];
 }
 
-async function collectPartnersInternalRoutes(baseFolder) {
-	const internalSectionVariants = [path.join(baseFolder, "(internal-section)"), path.join(baseFolder, "internal-section")];
-	let internalRoot = null;
-	for (const cand of internalSectionVariants) {
-		if (fs.existsSync(cand)) {
-			internalRoot = cand;
-			break;
+async function hasRouteFile(dir) {
+	for (const filename of ["page.js", "page.jsx", "page.ts", "page.tsx", "route.js", "route.ts"]) {
+		if (fs.existsSync(path.join(dir, filename))) return true;
+	}
+	return false;
+}
+
+function isRouteFolder(name) {
+	const lower = name.toLowerCase();
+	return !name.startsWith(".") && !name.startsWith("_") && !EXCLUDED_FOLDERS.has(lower) && !name.startsWith("(") && !name.startsWith("@") && !name.startsWith("[");
+}
+
+async function sectionDirectory(base, section) {
+	const candidate = path.join(base, section);
+	return (await isDirectory(candidate)) ? candidate : null;
+}
+
+// Returns first URL path segments for a section, including nested route groups.
+// Route groups do not contribute to the URL; route folders must contain an actual page
+// somewhere below them. This prevents treating arbitrary folders as routes.
+async function readSectionRoutes(sectionDir) {
+	if (!sectionDir) return [];
+	const routes = new Set();
+
+	async function walk(dir, prefix = "", depth = 0) {
+		if (depth > 12) return;
+		for (const name of await directories(dir)) {
+			if (name.startsWith("@") || name.startsWith("_") || EXCLUDED_FOLDERS.has(name.toLowerCase())) continue;
+			const child = path.join(dir, name);
+			if (name.startsWith("(") && name.endsWith(")")) {
+				await walk(child, prefix, depth + 1);
+			} else if (name.startsWith("[") || name.startsWith(".")) {
+				// Dynamic routes are not safe to classify by first segment automatically.
+				continue;
+			} else if (isRouteFolder(name)) {
+				const firstSegment = prefix || name;
+				if (await hasPageBelow(child)) routes.add(firstSegment);
+			}
 		}
 	}
-	if (!internalRoot) return [];
-	const children = await getImmediateDirectories(internalRoot);
-	const normalized = (s) => String(s).toLowerCase().replace(/[_\s]/g, "-");
-	const accountFolders = ["retail-account", "service-account", "content-account"];
-	const aggregated = new Set();
-	for (const account of accountFolders) {
-		const match = children.find((c) => normalized(c) === normalized(account));
-		if (!match) continue;
-		const accountPath = path.join(internalRoot, match);
-		const dirs = await getImmediateDirectories(accountPath);
-		dirs.forEach((d) => {
-			if (!EXCLUDED_FOLDERS.includes(d)) aggregated.add(d);
-		});
+	await walk(sectionDir);
+	return [...routes].sort();
+}
+
+async function hasPageBelow(dir, depth = 0) {
+	if (depth > 12) return false;
+	if (await hasRouteFile(dir)) return true;
+	for (const name of await directories(dir)) {
+		if (name.startsWith("_") || name.startsWith("@") || EXCLUDED_FOLDERS.has(name.toLowerCase())) continue;
+		if (await hasPageBelow(path.join(dir, name), depth + 1)) return true;
 	}
-	children.forEach((c) => {
-		if (!EXCLUDED_FOLDERS.includes(c)) aggregated.add(c);
-	});
-	return Array.from(aggregated);
+	return false;
+}
+
+// Preserve the original partners account-folder discovery behavior.
+// The returned segments are top-level paths; nested account routes are reached
+// via their account prefix, not by incorrectly flattening them.
+async function collectPartnersInternalRoutes(baseFolder) {
+	const internal = await sectionDirectory(baseFolder, "(internal-section)");
+	return readSectionRoutes(internal);
 }
 
 async function collectRoutesForSubdomain(subdomain) {
-	const normalize = (s) => String(s).toLowerCase().replace(/[_\s]/g, "-");
-	const baseExact = path.join(APP_DIR, subdomain);
-	if (fs.existsSync(baseExact)) {
-		const externalCandidates = [path.join(baseExact, "(external-section)"), path.join(baseExact, "external-section")];
-		const internalCandidates = [path.join(baseExact, "(internal-section)"), path.join(baseExact, "internal-section")];
-		const externalRoutes = await readSectionRoutes(externalCandidates);
-		let internalRoutes = [];
-		if (subdomain.toLowerCase() === "partners") {
-			internalRoutes = await collectPartnersInternalRoutes(baseExact);
-		} else {
-			internalRoutes = await readSectionRoutes(internalCandidates);
-		}
-		return { subdomain, externalRoutes, internalRoutes };
-	}
-	try {
-		const entries = await fsp.readdir(APP_DIR, { withFileTypes: true });
-		const folderNames = entries.filter((e) => e.isDirectory()).map((d) => d.name);
-		const ciMatch = folderNames.find((n) => n.toLowerCase() === subdomain.toLowerCase());
-		if (ciMatch) return collectRoutesForSubdomain(ciMatch);
-		const normalizedTarget = normalize(subdomain);
-		const normMatch = folderNames.find((n) => normalize(n) === normalizedTarget);
-		if (normMatch) return collectRoutesForSubdomain(normMatch);
-		const containsMatch = folderNames.find((n) => n.toLowerCase().includes(subdomain.toLowerCase()) || subdomain.toLowerCase().includes(n.toLowerCase()));
-		if (containsMatch) return collectRoutesForSubdomain(containsMatch);
-		return { subdomain, externalRoutes: [], internalRoutes: [] };
-	} catch {
-		return { subdomain, externalRoutes: [], internalRoutes: [] };
-	}
+	const base = path.join(APP_DIR, subdomain);
+	const externalDir = await sectionDirectory(base, "(external-section)");
+	const internalDir = await sectionDirectory(base, "(internal-section)");
+	return {
+		subdomain,
+		externalRoutes: await readSectionRoutes(externalDir),
+		internalRoutes: subdomain === "partners" ? await collectPartnersInternalRoutes(base) : await readSectionRoutes(internalDir),
+		externalHome: externalDir ? await hasRouteFile(externalDir) : false,
+		internalHome: internalDir ? await hasRouteFile(internalDir) : false
+	};
 }
 
-async function readSubdomainsFile() {
-	try {
-		const raw = await fsp.readFile(SUBDOMAINS_JSON, "utf8");
-		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return [];
-		return parsed.map((p) => (typeof p === "string" ? p : p.subdomain)).filter(Boolean);
-	} catch {
-		return [];
+async function discoverSubdomains() {
+	const names = await directories(APP_DIR);
+	const subdomains = [];
+	for (const name of names) {
+		if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(name)) continue;
+		if (EXCLUDED_FOLDERS.has(name.toLowerCase()) || name.toLowerCase() === "customers") continue;
+		if ((await sectionDirectory(path.join(APP_DIR, name), "(external-section)")) || (await sectionDirectory(path.join(APP_DIR, name), "(internal-section)"))) {
+			subdomains.push(name.toLowerCase());
+		}
 	}
+	return [...new Set(subdomains)].sort();
 }
 
 async function collectRootAppRoutes() {
-	const externalCandidates = [path.join(APP_DIR, "(external-section)"), path.join(APP_DIR, "external-section")];
-	const internalCandidates = [path.join(APP_DIR, "(internal-section)"), path.join(APP_DIR, "internal-section")];
-	const rootExternalRoutes = await readSectionRoutes(externalCandidates);
-	const rootInternalRoutes = await readSectionRoutes(internalCandidates);
-	return { rootExternalRoutes, rootInternalRoutes };
+	const external = await sectionDirectory(APP_DIR, "(external-section)");
+	const internal = await sectionDirectory(APP_DIR, "(internal-section)");
+	return {
+		rootExternalRoutes: await readSectionRoutes(external),
+		rootInternalRoutes: await readSectionRoutes(internal),
+		rootExternalHome: external ? await hasRouteFile(external) : false,
+		rootInternalHome: internal ? await hasRouteFile(internal) : false
+	};
 }
 
 async function buildPlatformRoutes() {
-	const names = await readSubdomainsFile();
-	const results = [];
-	for (const n of names) {
-		const r = await collectRoutesForSubdomain(n);
-		r.externalRoutes = Array.from(new Set(r.externalRoutes.map((s) => s.trim()).filter(Boolean)));
-		r.internalRoutes = Array.from(new Set(r.internalRoutes.map((s) => s.trim()).filter(Boolean)));
-		results.push(r);
+	const subdomains = await discoverSubdomains();
+	const platformRoutes = [];
+	for (const subdomain of subdomains) {
+		platformRoutes.push(await collectRoutesForSubdomain(subdomain));
 	}
-	const root = await collectRootAppRoutes();
-	return { platformRoutes: results, ...root };
+	return { subdomains, platformRoutes, ...(await collectRootAppRoutes()) };
 }
 
-function generateMiddlewareContent({ platformRoutes, rootExternalRoutes, rootInternalRoutes }) {
-	const routesLiteral = JSON.stringify(platformRoutes, null, 2);
-	const rootExternalLiteral = JSON.stringify(rootExternalRoutes, null, 2);
-	const rootInternalLiteral = JSON.stringify(rootInternalRoutes, null, 2);
+function generateMiddlewareContent(routes) {
+	const data = JSON.stringify(
+		{
+			platformRoutes: routes.platformRoutes,
+			rootExternalRoutes: routes.rootExternalRoutes,
+			rootInternalRoutes: routes.rootInternalRoutes,
+			rootExternalHome: routes.rootExternalHome,
+			rootInternalHome: routes.rootInternalHome
+		},
+		null,
+		2
+	);
 
 	return `/*
-* AUTO-GENERATED Proxy.js
-* Generated by scripts/generate-proxy.js
-* DO NOT EDIT THIS FILE DIRECTLY — edit subdomains.json, your app folders, or script/generate-proxy.js instead.
-*/
-
+ * AUTO-GENERATED proxy.js — DO NOT EDIT DIRECTLY.
+ * Edit scripts/generate-proxy.js or app/ routes instead.
+ */
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-export const PLATFORM_ROUTES = ${routesLiteral};
-
-export const ROOT_EXTERNAL_ROUTES = ${rootExternalLiteral};
-export const ROOT_INTERNAL_ROUTES = ${rootInternalLiteral};
+const ROUTING = ${data};
+export const PLATFORM_ROUTES = ROUTING.platformRoutes;
+export const ROOT_EXTERNAL_ROUTES = ROUTING.rootExternalRoutes;
+export const ROOT_INTERNAL_ROUTES = ROUTING.rootInternalRoutes;
 
 export const config = {
-matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api(?:/|$)|_next(?:/|$)|favicon.ico$|robots.txt$|sitemap.xml$).*)"]
 };
 
-function findPlatformRoutesForSubdomain(subdomain) {
-return PLATFORM_ROUTES.find((p) => p.subdomain === subdomain) || { subdomain, externalRoutes: [], internalRoutes: [] };
+function pathMatches(pathname, segments) {
+  return segments.some((segment) =>
+    pathname === \`/\${segment}\` || pathname.startsWith(\`/\${segment}/\`)
+  );
 }
 
-// ✅ Helper: clone a response while preserving cookies
-function withCookies(baseResponse, newResponse) {
-const cookies = baseResponse.cookies.getAll();
-cookies.forEach((cookie) => {
-newResponse.cookies.set(cookie);
-});
-return newResponse;
+function resolveHost(hostname) {
+  const rootDomain = (process.env.ROOT_DOMAIN || "lafayseatery.com")
+    .toLowerCase().replace(/^https?:\\/\\//, "").replace(/\\/.*$/, "").replace(/:\\d+$/, "");
+  const vercelHost = (process.env.VERCEL_URL || "").toLowerCase();
+  if (hostname === rootDomain || hostname === \`www.\${rootDomain}\` ||
+      hostname === "localhost" || hostname === "127.0.0.1" ||
+      (vercelHost && hostname === vercelHost)) {
+    return { type: "root", subdomain: null };
+  }
+  let subdomain = null;
+  if (hostname.endsWith(\`.\${rootDomain}\`)) {
+    subdomain = hostname.slice(0, -(rootDomain.length + 1));
+  } else if (hostname.endsWith(".localhost")) {
+    subdomain = hostname.slice(0, -".localhost".length);
+  }
+  if (!subdomain || subdomain.includes(".")) return { type: "unknown", subdomain: null };
+  const registered = PLATFORM_ROUTES.find((entry) => entry.subdomain === subdomain);
+  return registered
+    ? { type: "subdomain", subdomain, routes: registered }
+    : { type: "unknown", subdomain };
+}
+
+
+
+function withDomainCookie(response, domain, request) {
+  // Expose the resolved domain to the next request, and to the browser.
+  response.cookies.set("domain", domain, {
+    path: "/",
+    httpOnly: false,
+    secure: request.nextUrl.protocol === "https:",
+    sameSite: "lax"
+  });
+  return response;
+}
+
+function rewrite(request, pathname) {
+  const destination = request.nextUrl.clone();
+  destination.pathname = pathname;
+  return NextResponse.rewrite(destination);
+}
+
+function redirect(request, pathname) {
+  const destination = request.nextUrl.clone();
+  destination.pathname = pathname;
+  destination.search = "";
+  return NextResponse.redirect(destination);
 }
 
 export async function proxy(req) {
-const activeSession = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-const { pathname, origin } = req.nextUrl;
-const url = new URL(req.url);
-const hostname = req.headers.get("host") ?? "";
-const subdomain = hostname?.split(".")[0];
-const port = url.port;
+ const pathname = req.nextUrl.pathname;
+ const rawHost = req.headers.get("host") ?? "";
+ const hostname = rawHost.toLowerCase().split(":")[0];
+ const host = resolveHost(hostname);
 
-const allowedDomains = [\`localhost:\${port}\`, "https://www.lafayseatery.com/", "https://lafayseatery-9kt7q4obg-synergistic-enterprises.vercel.app/"];
-const isAllowedDomain = allowedDomains.some((domain) => hostname.includes(domain));
-const isValidSubdomain = PLATFORM_ROUTES.some((d) => d.subdomain === subdomain);
-const isNotSubDomain = !isValidSubdomain;
+ //console.log("[PROXY REQUEST]", {
+ //hostname,
+ //pathname,
+ //hostType: host.type,
+ //subdomain: host.subdomain,
+ //routes: host.routes
+ //});
 
-// create a base response that always sets the cookie
-const baseResponse = NextResponse.next();
-baseResponse.cookies.set("domain", isNotSubDomain ? "customers" : subdomain, {
-path: "/",
-httpOnly: false, // readable on client side
-secure: process.env.NODE_ENV === "production",
-sameSite: "lax"
-});
- 
-if (isAllowedDomain && isNotSubDomain) {
-const isInternalRoute = ROOT_INTERNAL_ROUTES.some((r) => pathname.includes(r));
-const isExternalRoute = ROOT_EXTERNAL_ROUTES.some((r) => pathname === "/" || pathname.includes(r));
+ //console.log("[PROXY HOST DEBUG]", {
+ //rawHost: req.headers.get("host"),
+ //forwardedHost: req.headers.get("x-forwarded-host"),
+ //nextUrlHostname: req.nextUrl.hostname,
+ //resolvedHostname: hostname,
+ //hostType: host.type,
+ //subdomain: host.subdomain
+ //});
 
-if (!activeSession) {
-if (isInternalRoute) return withCookies(baseResponse, NextResponse.redirect(new URL("/login", origin)));
-if (isExternalRoute) return baseResponse;
-} else {
-if (isExternalRoute) return withCookies(baseResponse, NextResponse.redirect(new URL("/dashboard", origin)));
-if (isInternalRoute) return baseResponse;
-}
-}
-if (isValidSubdomain) {
-const platformRoutes = findPlatformRoutesForSubdomain(subdomain);
+  const domain = host.type === "subdomain" ? host.subdomain : "customers";
+  const respond = (response) => withDomainCookie(response, domain, req);
 
-const { externalRoutes = [], internalRoutes = [] } = platformRoutes;
+  if (host.type === "unknown") {
+    return new NextResponse("Unknown hostname or subdomain", { status: 404 });
+  }
 
-const isInternalRoute = internalRoutes.some((r) => pathname.startsWith(\`/\${r}\`));
-const isExternalRoute = externalRoutes.some((r) => pathname === "/" || pathname.startsWith(\`/\${r}\`));
+  const routes = host.type === "subdomain" ? host.routes : {
+    externalRoutes: ROOT_EXTERNAL_ROUTES,
+    internalRoutes: ROOT_INTERNAL_ROUTES,
+    externalHome: ROUTING.rootExternalHome,
+    internalHome: ROUTING.rootInternalHome
+  };
 
-// Block invalid routes
-const isKnownRoute = isInternalRoute || isExternalRoute;
+  const isHome = pathname === "/";
+  const isExternalRoute = (isHome && (routes.externalHome || !routes.internalHome)) ||
+    pathMatches(pathname, routes.externalRoutes);
+  const isInternalRoute = (isHome && !routes.externalHome && routes.internalHome) ||
+    pathMatches(pathname, routes.internalRoutes);
 
-if (!isKnownRoute) {
-return withCookies(
-baseResponse,
-NextResponse.rewrite(new URL("/not-found", origin))
-);
-}
+  // Keep the login and registration pages reachable without a session.
+  // These are conventional paths; if you use different ones, change them here.
+  const isAuthPage = pathname === "/login" || pathname === "/register" ||
+    pathname === "/sign-in" || pathname === "/sign-up";
+  const isKnownRoute = isExternalRoute || isInternalRoute || isAuthPage;
+  const internalPath = host.type === "subdomain"
+    ? \`/\${host.subdomain}\${pathname === "/" ? "" : pathname}\`
+    : pathname;
 
-//Auth logic
-if (!activeSession) {
-if (isInternalRoute)
-return withCookies(baseResponse, NextResponse.redirect(new URL("/login", origin)));
+  if (!isKnownRoute) {
+    return respond(rewrite(req, host.type === "subdomain"
+      ? \`/\${host.subdomain}/not-found\` : "/not-found"));
+  }
 
-if (isExternalRoute)
-return withCookies(
-baseResponse,
-NextResponse.rewrite(new URL(\`\/\${subdomain}\${url.pathname}\`, req.url))
-);
-}
+  const activeSession = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-if (activeSession) {
-if (pathname === "/" || isExternalRoute) return withCookies(baseResponse, NextResponse.redirect(new URL("/dashboard", origin)));
-if (isInternalRoute) return withCookies(baseResponse, NextResponse.rewrite(new URL(\`\/\${subdomain}\${url.pathname}\`, req.url)));
-}
-}
+  if (!activeSession && isInternalRoute) {
+    return respond(redirect(req, "/login"));
+  }
 
-//Default fallback: always return cookie-enabled response
-return baseResponse;
+  if (activeSession && isExternalRoute && !isAuthPage) {
+    // Only redirect when the target exists in this domain's internal routes.
+    if (routes.internalRoutes.includes("dashboard")) {
+      return respond(redirect(req, "/dashboard"));
+    }
+  }
+
+  if (host.type === "subdomain") {
+    return respond(rewrite(req, internalPath));
+  }
+  return respond(NextResponse.next());
 }
 `;
 }
 
-async function buildAndWriteMiddleware() {
+async function writeIfChanged(filename, content) {
+	let previous = null;
 	try {
-		const routes = await buildPlatformRoutes();
-		const content = generateMiddlewareContent(routes);
-		const newHash = sha256(content);
-
-		let oldHash = null;
-		if (fs.existsSync(OUTPUT_MIDDLEWARE)) {
-			const prev = await fsp.readFile(OUTPUT_MIDDLEWARE, "utf8");
-			oldHash = sha256(prev);
-		}
-
-		if (newHash !== oldHash) {
-			await fsp.writeFile(OUTPUT_MIDDLEWARE, content, "utf8");
-			console.log(`[generate-proxy] ✅ proxy.js updated at ${OUTPUT_MIDDLEWARE}`);
-		} else {
-			console.log(`[generate-proxy] ⚙️  No changes detected — skipped write`);
-		}
-	} catch (err) {
-		console.error("[generate-proxy] ❌ Error building proxy:", err);
+		previous = await fsp.readFile(filename, "utf8");
+	} catch (error) {
+		if (error.code !== "ENOENT") throw error;
 	}
+	if (previous !== null && sha256(previous) === sha256(content)) return false;
+	await fsp.writeFile(filename, content, "utf8");
+	console.log(`[generate-proxy] Updated ${path.relative(PROJECT_ROOT, filename)}`);
+	return true;
+}
+
+async function buildAndWriteMiddleware() {
+	const routes = await buildPlatformRoutes();
+	await writeIfChanged(
+		SUBDOMAINS_JSON,
+		`${JSON.stringify(
+			routes.subdomains.map((subdomain) => ({ subdomain })),
+			null,
+			2
+		)}\n`
+	);
+	await writeIfChanged(OUTPUT_PROXY, generateMiddlewareContent(routes));
+	console.log(`[generate-proxy] ${routes.subdomains.length} subdomain(s): ${routes.subdomains.join(", ") || "none"}`);
+}
+
+function enqueueBuild() {
+	buildQueue = buildQueue.catch(() => {}).then(buildAndWriteMiddleware);
+	buildQueue.catch((error) => console.error("[generate-proxy] Build failed:", error));
+	return buildQueue;
+}
+
+function scheduleBuild() {
+	clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		void enqueueBuild();
+	}, DEBOUNCE_MS);
 }
 
 async function startWatcher() {
-	console.log("[generate-proxy] Starting watcher...");
-	await buildAndWriteMiddleware();
-
-	chokidar.watch(SUBDOMAINS_JSON, { persistent: true, ignoreInitial: true }).on("change", () => {
-		debounce(async () => {
-			console.log("[generate-proxy] subdomains.json changed — rebuilding...");
-			await buildAndWriteMiddleware();
-		});
+	await enqueueBuild();
+	console.log("[generate-proxy] Watching app/ for route changes...");
+	const watcher = chokidar.watch(APP_DIR, {
+		ignoreInitial: true,
+		persistent: true,
+		ignored: (candidate, stats) => {
+			const relative = path.relative(APP_DIR, candidate);
+			if (!relative || relative.startsWith("..")) return false;
+			return relative.split(path.sep).some((part) => EXCLUDED_FOLDERS.has(part.toLowerCase()) || part.startsWith("_"));
+		}
 	});
-
-	chokidar
-		.watch(`${APP_DIR}/**/*`, {
-			persistent: true,
-			ignoreInitial: true,
-			ignored: (p) => EXCLUDED_FOLDERS.some((ex) => p.includes(`${path.sep}${ex}${path.sep}`) || p.endsWith(`${path.sep}${ex}`)),
-			depth: 5
-		})
-		.on("all", (event, filePath) => {
-			if (filePath.includes("external-section") || filePath.includes("(external-section)") || filePath.includes("internal-section") || filePath.includes("(internal-section)")) {
-				debounce(async () => {
-					console.log(`[generate-proxy] ${event}: ${filePath} — rebuilding middleware.js`);
-					await buildAndWriteMiddleware();
-				});
-			}
-		});
-
-	console.log("[generate-proxy] Watching for changes...");
+	watcher.on("all", (event, changedPath) => {
+		if (!["add", "unlink", "addDir", "unlinkDir"].includes(event)) return;
+		console.log(`[generate-proxy] ${event}: ${path.relative(PROJECT_ROOT, changedPath)}`);
+		scheduleBuild();
+	});
+	watcher.on("error", (error) => console.error("[generate-proxy] Watcher error:", error));
 }
 
 async function cli() {
-	const args = process.argv.slice(2);
-	const runOnce = args.includes("--once");
-	if (runOnce) {
-		console.log("[generate-proxy] Running once (--once)...");
-		await buildAndWriteMiddleware();
-		process.exit(0);
-	} else {
-		await startWatcher();
-	}
+	if (process.argv.includes("--once")) await enqueueBuild();
+	else await startWatcher();
 }
 
-cli().catch((err) => {
-	console.error("[generate-proxy] Fatal error:", err);
-	process.exit(1);
+cli().catch((error) => {
+	console.error("[generate-proxy] Fatal error:", error);
+	process.exitCode = 1;
 });
 
-export { buildAndWriteMiddleware, startWatcher, collectRoutesForSubdomain };
+export { buildAndWriteMiddleware, startWatcher, collectRoutesForSubdomain, discoverSubdomains };

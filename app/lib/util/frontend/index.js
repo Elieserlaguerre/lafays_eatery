@@ -393,6 +393,10 @@ export const dynamicLayoutThemeColor = (domain) => {
 				border: "border-slate-300"
 			};
 
+		case "support":
+			return;
+		case "careers":
+			return;
 		default:
 			throw new Error("domain is not recognized.");
 	}
