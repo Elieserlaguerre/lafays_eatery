@@ -4,6 +4,7 @@ import ProvidersLayout from "../../components/layouts/ProvidersLayout";
 import ExternalLayout from "../../components/layouts/ExternalLayout";
 import { Suspense } from "react";
 import ProvidersFallback from "../../components/global-components/ProvidersFallback";
+import CareerCenter from "@/app/components/external-components/careers/CareerCenter";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -29,7 +30,9 @@ export default function RootLayout({ children }) {
 			<body className="min-h-full flex flex-col">
 				<Suspense fallback={<ProvidersFallback />}>
 					<ProvidersLayout>
-						<ExternalLayout>{children}</ExternalLayout>
+						<ExternalLayout>
+							<CareerCenter>{children}</CareerCenter>
+						</ExternalLayout>
 					</ProvidersLayout>
 				</Suspense>
 			</body>
