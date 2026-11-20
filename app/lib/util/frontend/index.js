@@ -394,9 +394,41 @@ export const dynamicLayoutThemeColor = (domain) => {
 			};
 
 		case "support":
-			return;
+			return {
+				base: "bg-gradient-to-br from-indigo-600 to-indigo-900",
+				contrast: "bg-slate-100",
+				hover: "hover:bg-slate-100",
+				sectionNavbar: {
+					root: "bg-purple-700",
+					hover: "hover:border-purple-300"
+				},
+				text: {
+					primary: "text-white",
+					secondary: "text-indigo-200",
+					dark: "text-gray-900",
+					muted: "text-gray-600",
+					navbar: "text-white"
+				},
+				border: "border-slate-300"
+			};
 		case "careers":
-			return;
+			return {
+				base: "bg-gradient-to-br from-indigo-600 to-indigo-900",
+				contrast: "bg-slate-100",
+				hover: "hover:bg-slate-100",
+				sectionNavbar: {
+					root: "bg-purple-700",
+					hover: "hover:border-purple-300"
+				},
+				text: {
+					primary: "text-white",
+					secondary: "text-indigo-200",
+					dark: "text-gray-900",
+					muted: "text-gray-600",
+					navbar: "text-white"
+				},
+				border: "border-slate-300"
+			};
 		default:
 			throw new Error("domain is not recognized.");
 	}
